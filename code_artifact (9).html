@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>火柴人極速奔跑 (Stickman Neon Runner) - 終極地獄挑戰版</title>
+    <!-- 引入 Tailwind CSS 提供精美 UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Font Awesome 提供圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', 'Orbitron', sans-serif;
+            background-color: #0d0e15;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        /* 霓虹字體與發光效果 */
+        .neon-text-blue {
+            text-shadow: 0 0 5px #00f0ff, 0 0 10px #00f0ff, 0 0 20px #00f0ff;
+        }
+        .neon-text-pink {
+            text-shadow: 0 0 5px #ff007f, 0 0 10px #ff007f, 0 0 20px #ff007f;
+        }
+        .neon-text-green {
+            text-shadow: 0 0 5px #10b981, 0 0 10px #10b981, 0 0 20px #10b981;
+        }
+        .neon-text-gold {
+            text-shadow: 0 0 5px #fbbf24, 0 0 10px #fbbf24, 0 0 20px #fbbf24;
+        }
+        .neon-text-red {
+            text-shadow: 0 0 5px #ef4444, 0 0 10px #ef4444, 0 0 20px #ef4444;
+        }
+        .neon-border {
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.5), inset 0 0 10px rgba(0, 240, 255, 0.2);
+        }
+        
+        /* 隱藏手機端長按彈出選單 */
+        canvas {
+            touch-action: none;
+            -webkit-touch-callout: none;
+        }
+
+        /* 呼吸警示特效 */
+        @keyframes warning-pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        .animate-warning {
+            animation: warning-pulse 1s infinite;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 text-white">
+
+    <!-- 遊戲主容器 -->
+    <div class="relative w-full max-w-4xl bg-gray-900 rounded-2xl overflow-hidden border-2 border-cyan-500 neon-border flex flex-col shadow-[0_0_30px_rgba(0,240,255,0.3)]">
+        
+        <!-- 頂部資訊列 -->
+        <div class="flex justify-between items-center p-4 bg-gray-950/80 border-b border-gray-800">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl text-cyan-400"><i class="fa-solid fa-person-running animate-pulse"></i></span>
+                <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
+                    <h1 class="text-xl md:text-2xl font-black tracking-widest text-cyan-400 font-['Orbitron']">NEON RUNNER</h1>
+                    <!-- 警告標誌 (第 5、10 關與地獄難度啟用) -->
+                    <span id="ui-warning-badge" class="hidden text-[10px] px-2 py-0.5 rounded bg-red-900/60 border border-red-500 text-red-400 font-black tracking-wider uppercase animate-warning">
+                        ⚠️ SPEED SPIKE!
+                    </span>
+                </div>
+            </div>
+            
+            <!-- 分數看板 -->
+            <div class="flex gap-6 font-['Orbitron'] text-sm md:text-base">
+                <div class="text-gray-400">
+                    <span id="ui-hi-score-label">HI</span> <span id="hi-score" class="text-pink-500 font-bold ml-1">00000</span>
+                </div>
+                <div class="text-white">
+                    TOTAL <span id="current-score" class="text-cyan-400 font-bold ml-1">00000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 關卡進度條與生命值區 -->
+        <div class="w-full bg-gray-950 px-4 pb-3 pt-1 border-b border-gray-850 flex items-center justify-between gap-3 md:gap-4 text-xs flex-wrap md:flex-nowrap">
+            <div class="flex items-center gap-4">
+                <!-- 關卡顯示 -->
+                <div class="flex items-center gap-1.5 font-bold">
+                    <span class="text-gray-500 uppercase tracking-wider font-['Orbitron']">STAGE</span>
+                    <span id="ui-level" class="text-cyan-400 font-['Orbitron'] text-base font-black px-2 py-0.5 bg-cyan-950/40 rounded border border-cyan-500/20">1</span>
+                </div>
+                <!-- 3條命生命顯示 (不可疊加) -->
+                <div class="flex items-center gap-1.5 bg-gray-900/80 px-2.5 py-1 rounded border border-gray-800">
+                    <span class="text-gray-500 font-bold uppercase tracking-wider font-['Orbitron'] text-[9px] mr-1">LIVES</span>
+                    <span id="ui-lives-container" class="flex gap-1 items-center">
+                        <!-- 動態生成愛心 -->
+                    </span>
+                </div>
+            </div>
+            
+            <!-- 實時關卡進度條 -->
+            <div class="flex-1 h-3 bg-gray-900 rounded-full overflow-hidden border border-gray-800 relative shadow-inner min-w-[120px]">
+                <div id="ui-progress" class="h-full bg-gradient-to-r from-cyan-500 to-pink-500 w-0 transition-all duration-100 shadow-[0_0_8px_rgba(6,182,212,0.5)]"></div>
+            </div>
+            <div class="text-gray-400 font-['Orbitron'] font-bold flex gap-1 items-center">
+                <span id="ui-progress-text" class="text-cyan-400">0</span>
+                <span class="text-gray-600">/</span>
+                <span id="ui-target-score" class="text-gray-500">300</span>
+            </div>
+        </div>
+
+        <!-- 遊戲畫布區域 -->
+        <div class="relative w-full aspect-[2/1] bg-gradient-to-b from-gray-950 to-gray-900">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+            
+            <!-- 遊戲開始 / 結束覆蓋畫面 -->
+            <div id="overlay" class="absolute inset-0 bg-black/85 flex flex-col items-center justify-center text-center p-6 transition-all duration-300">
+                <!-- 開始畫面狀態 -->
+                <div id="start-state" class="space-y-6">
+                    <h2 class="text-4xl md:text-6xl font-black text-cyan-400 tracking-wider neon-text-blue font-['Orbitron']">STICKMAN RUNNER</h2>
+                    
+                    <!-- 難度模式選擇 -->
+                    <div class="flex flex-col items-center gap-2.5">
+                        <span class="text-xs text-gray-500 font-bold uppercase tracking-wider">選擇挑戰模式 / Game Mode</span>
+                        <div class="flex gap-4">
+                            <button id="mode-classic-btn" class="px-5 py-2.5 rounded-xl border border-cyan-500 bg-cyan-950/40 text-cyan-400 font-bold text-sm tracking-wider transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.3)] hover:scale-105 active:scale-95">
+                                <i class="fa-solid fa-layer-group mr-1.5"></i> 經典 10 關 (3命)
+                            </button>
+                            <button id="mode-hell-btn" class="px-5 py-2.5 rounded-xl border border-red-950/60 bg-transparent text-gray-500 font-bold text-sm tracking-wider transition-all duration-300 opacity-60 hover:opacity-100 hover:border-red-500 hover:text-red-400 hover:scale-105 active:scale-95">
+                                <i class="fa-solid fa-skull mr-1.5 animate-pulse"></i> 無盡地獄 (1命) 💀
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="text-gray-400 max-w-xl mx-auto text-xs md:text-sm space-y-1">
+                        <p id="mode-desc">避開不斷襲來的霓虹障礙物！跑滿第一關目標 <span class="text-cyan-400 font-bold">300分</span> 即可進入下一關。全作共 10 關，每關特許 3 條命！</p>
+                        <p id="mode-warn" class="text-red-400 font-bold">🔥 警告：經典模式第 5 關【煉獄】與第 10 關【終極決戰】難度將瘋狂飆升！</p>
+                    </div>
+                    
+                    <!-- 電腦端操作說明 -->
+                    <div class="hidden md:flex justify-center gap-8 text-sm text-gray-300">
+                        <div class="flex items-center gap-2">
+                            <kbd class="px-2.5 py-1.5 bg-gray-800 border border-gray-600 rounded text-xs font-bold shadow-md">↑</kbd> 或 
+                            <kbd class="px-4 py-1.5 bg-gray-800 border border-gray-600 rounded text-xs font-bold shadow-md">SPACE</kbd>
+                            <span>跳躍 (可二段跳)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <kbd class="px-2.5 py-1.5 bg-gray-800 border border-gray-600 rounded text-xs font-bold shadow-md">↓</kbd>
+                            <span>滑行 (低頭躲避)</span>
+                        </div>
+                    </div>
+                    
+                    <button id="start-btn" class="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-lg rounded-full shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all duration-300 transform hover:scale-105 active:scale-95">
+                        <i class="fa-solid fa-play mr-2"></i> 開始挑戰
+                    </button>
+                </div>
+
+                <!-- 闖關成功狀態 (Level Clear) -->
+                <div id="level-clear-state" class="hidden space-y-6">
+                    <h2 class="text-4xl md:text-6xl font-black text-green-400 tracking-wider neon-text-green font-['Orbitron']">STAGE CLEAR!</h2>
+                    <div class="space-y-2">
+                        <p class="text-gray-400 text-sm md:text-base">恭喜成功突破第 <span id="clear-level-num" class="text-white font-bold text-lg">1</span> 關！</p>
+                        <p id="ui-next-level-tip" class="text-xl md:text-2xl font-bold text-cyan-300">即將自動進入下一關...</p>
+                        <p class="text-emerald-400 font-bold text-sm">💖 生命值已為您補滿至 3 條！</p>
+                        <p id="ui-next-level-warning" class="text-xs text-rose-400 font-semibold tracking-wider">難度警告：下一關目標提高 500 分，速度更快且障礙物更密集！</p>
+                    </div>
+                    
+                    <!-- 轉場倒數條 -->
+                    <div class="w-64 h-2 bg-gray-800 rounded-full mx-auto overflow-hidden border border-green-500/30">
+                        <div id="transition-progress" class="h-full bg-green-400 w-full transition-all duration-100"></div>
+                    </div>
+                </div>
+
+                <!-- 終極全部通關勝利狀態 -->
+                <div id="game-victory-state" class="hidden space-y-6">
+                    <h2 class="text-4xl md:text-6xl font-black text-amber-400 tracking-wider neon-text-gold font-['Orbitron']">🏆 VICTORY!</h2>
+                    <div class="space-y-3">
+                        <p class="text-xl md:text-2xl font-black text-white">恭喜您！成功征服全部 10 個關卡！</p>
+                        <p class="text-gray-400 text-sm max-w-md mx-auto">您完美突破了第 5 關與第 10 關的究極試煉，展現了神一般的反應力！</p>
+                        <p class="text-cyan-400 font-black text-lg">榮耀總得分: <span id="victory-score" class="text-2xl font-black">0</span></p>
+                    </div>
+                    
+                    <button id="victory-restart-btn" class="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-gray-950 font-black text-lg rounded-full shadow-[0_0_20px_rgba(251,191,36,0.6)] transition-all duration-300 transform hover:scale-105 active:scale-95">
+                        <i class="fa-solid fa-trophy mr-2"></i> 榮譽重跑
+                    </button>
+                </div>
+
+                <!-- 遊戲結束狀態 -->
+                <div id="gameover-state" class="hidden space-y-6">
+                    <h2 class="text-4xl md:text-6xl font-black text-pink-500 tracking-wider neon-text-pink font-['Orbitron']">GAME OVER</h2>
+                    <div class="space-y-2">
+                        <p id="gameover-score-desc" class="text-gray-400 text-sm md:text-base">生命耗盡！本次累計總得分</p>
+                        <p id="final-score" class="text-4xl md:text-5xl font-black text-cyan-400 font-['Orbitron']">0</p>
+                        <p id="gameover-level-desc" class="text-xs text-gray-500">敗在第 <span id="gameover-level-num">1</span> 關，再接再厲！</p>
+                    </div>
+                    
+                    <!-- 修正與新增：死後可選擇「重新開始」或「一鍵切換另一個模式挑戰」 -->
+                    <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+                        <button id="restart-btn" class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold text-lg rounded-full shadow-[0_0_15px_rgba(244,63,94,0.4)] transition-all duration-300 transform hover:scale-105 active:scale-95">
+                            <i class="fa-solid fa-rotate-left mr-2"></i> 重新開始
+                        </button>
+                        <button id="gameover-switch-btn" class="w-full sm:w-auto px-8 py-3 text-white font-bold text-lg rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95">
+                            <!-- JS 動態寫入內容 -->
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 速度提升提示特效 -->
+            <div id="speed-alert" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-cyan-500/20 border border-cyan-400 px-4 py-1.5 rounded-full text-cyan-300 text-xs font-bold tracking-widest uppercase opacity-0 pointer-events-none transition-all duration-300">
+                Speed Up! 加速前進
+            </div>
+        </div>
+
+        <!-- 手機端虛擬控制器 -->
+        <div class="grid grid-cols-2 gap-4 p-4 bg-gray-950 border-t border-gray-800 md:hidden">
+            <button id="touch-jump" class="h-16 active:scale-95 bg-cyan-950/50 active:bg-cyan-900 border border-cyan-500/30 active:border-cyan-400 rounded-xl flex flex-col items-center justify-center transition-all">
+                <i class="fa-solid fa-chevron-up text-lg text-cyan-400"></i>
+                <span class="text-xs text-cyan-300 font-bold mt-1">跳躍 (JUMP)</span>
+            </button>
+            <button id="touch-slide" class="h-16 active:scale-95 bg-pink-950/50 active:bg-pink-900 border border-pink-500/30 active:border-pink-400 rounded-xl flex flex-col items-center justify-center transition-all">
+                <i class="fa-solid fa-chevron-down text-lg text-pink-400"></i>
+                <span class="text-xs text-pink-300 font-bold mt-1">滑行 (SLIDE)</span>
+            </button>
+        </div>
+        
+        <!-- 靜音與音效設定 -->
+        <div class="flex justify-between items-center px-6 py-3 bg-gray-950 text-xs text-gray-500 border-t border-gray-900">
+            <span>使用 ↑ / ↓ 或螢幕按鈕操作</span>
+            <button id="mute-btn" class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                <i id="mute-icon" class="fa-solid fa-volume-high"></i>
+                <span id="mute-text">音效開啟</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 腳本邏輯 -->
+    <script>
+        // --- 網頁音效生成器 (Web Audio API) ---
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+        let isMuted = false;
+
+        function playSound(type) {
+            if (isMuted) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new AudioCtx();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'jump') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'slide') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, now);
+                    osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'hit') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(10, now + 0.4);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'score') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'level_clear') {
+                    // 闖關成功音效
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(261.63, now); // C4
+                    osc.frequency.setValueAtTime(329.63, now + 0.08); // E4
+                    osc.frequency.setValueAtTime(392.00, now + 0.16); // G4
+                    osc.frequency.setValueAtTime(523.25, now + 0.24); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.32); // E5
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                } else if (type === 'victory') {
+                    // 終極全通關音效
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.1);
+                    osc.frequency.setValueAtTime(783.99, now + 0.2);
+                    osc.frequency.setValueAtTime(1046.50, now + 0.3);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                    osc.start(now);
+                    osc.stop(now + 0.8);
+                }
+            } catch (e) {
+                console.log("Audio error:", e);
+            }
+        }
+
+        // --- 遊戲邏輯與渲染引擎 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI 元素
+        const currentScoreEl = document.getElementById('current-score');
+        const hiScoreEl = document.getElementById('hi-score');
+        const uiHiScoreLabel = document.getElementById('ui-hi-score-label');
+        const overlay = document.getElementById('overlay');
+        const startState = document.getElementById('start-state');
+        const levelClearState = document.getElementById('level-clear-state');
+        const gameVictoryState = document.getElementById('game-victory-state');
+        const gameoverState = document.getElementById('gameover-state');
+        const finalScoreEl = document.getElementById('final-score');
+        const victoryScoreEl = document.getElementById('victory-score');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const victoryRestartBtn = document.getElementById('victory-restart-btn');
+        const speedAlertEl = document.getElementById('speed-alert');
+        const muteBtn = document.getElementById('mute-btn');
+        const muteIcon = document.getElementById('mute-icon');
+        const muteText = document.getElementById('mute-text');
+        
+        // 闖關與關卡 UI 元素
+        const uiLevel = document.getElementById('ui-level');
+        const uiProgress = document.getElementById('ui-progress');
+        const uiProgressText = document.getElementById('ui-progress-text');
+        const uiTargetScore = document.getElementById('ui-target-score');
+        const clearLevelNum = document.getElementById('clear-level-num');
+        const gameoverLevelNum = document.getElementById('gameover-level-num');
+        const transitionProgress = document.getElementById('transition-progress');
+        const uiWarningBadge = document.getElementById('ui-warning-badge');
+        const uiNextLevelWarning = document.getElementById('ui-next-level-warning');
+        
+        // 難度選擇按鈕與文字說明
+        const modeClassicBtn = document.getElementById('mode-classic-btn');
+        const modeHellBtn = document.getElementById('mode-hell-btn');
+        const modeDesc = document.getElementById('mode-desc');
+        const modeWarn = document.getElementById('mode-warn');
+
+        // 遊戲結束 UI 元素變數
+        const gameoverScoreDesc = document.getElementById('gameover-score-desc');
+        const gameoverLevelDesc = document.getElementById('gameover-level-desc');
+        const gameoverSwitchBtn = document.getElementById('gameover-switch-btn'); // 死亡畫面的模式切換按鈕
+
+        // 生命值 UI 容器
+        const uiLivesContainer = document.getElementById('ui-lives-container');
+
+        // 手機觸控按鈕
+        const btnJump = document.getElementById('touch-jump');
+        const btnSlide = document.getElementById('touch-slide');
+
+        // 設置畫布尺寸
+        function resizeCanvas() {
+            canvas.width = 800;
+            canvas.height = 400;
+        }
+        resizeCanvas();
+
+        // 關卡與生命值參數
+        let gameMode = 'CLASSIC';    // CLASSIC (經典關卡) 或 HELL (無盡地獄)
+        let currentLevel = 1;
+        let totalScore = 0;          // 累計總得分
+        let currentLevelScore = 0;   // 本關內獲得的得分
+        let accumulatedScore = 0;    // 先前過關累積的總分基數
+        
+        // 生命值與無敵狀態設定
+        let lives = 3;               // 生命值
+        let isInvulnerable = false;  // 是否處於受傷後無敵時間
+        let invulnerableTimer = 0;   // 無敵時間計時器
+
+        // 遊戲狀態變數
+        let gameState = 'START'; // START, PLAYING, LEVEL_CLEAR, GAMEOVER, VICTORY
+        
+        // 歷史最高分載入
+        let hiScoreClassic = parseInt(localStorage.getItem('stickman_hi_score_classic')) || 0;
+        let hiScoreHell = parseInt(localStorage.getItem('stickman_hi_score_hell')) || 0;
+        
+        // 預設顯示經典模式最高分
+        hiScoreEl.textContent = String(hiScoreClassic).padStart(5, '0');
+
+        let gameSpeed = 6;
+        let baseSpeed = 6;
+        let maxSpeed = 15;
+        let frameCount = 0;
+        let levelFrameCount = 0;     // 記錄當前關卡的幀數
+        let shakeFrames = 0;         // 畫面抖動
+        let levelClearTimer = 0;     // 關卡成功倒數
+
+        // 10 關各具風格的動態霓虹色彩主題設定
+        const levelThemes = [
+            { player: '#00f0ff', track: '#ff007f', shadow: '#00f0ff', name: 'STAGE 1' }, 
+            { player: '#f59e0b', track: '#3b82f6', shadow: '#f59e0b', name: 'STAGE 2' }, 
+            { player: '#10b981', track: '#a855f7', shadow: '#10b981', name: 'STAGE 3' }, 
+            { player: '#f43f5e', track: '#14b8a6', shadow: '#f43f5e', name: 'STAGE 4' }, 
+            { player: '#ef4444', track: '#f97316', shadow: '#ef4444', name: '💀 HELL STAGE 5' }, 
+            { player: '#ffffff', track: '#06b6d4', shadow: '#ffffff', name: 'STAGE 6' }, 
+            { player: '#a3e635', track: '#db2777', shadow: '#a3e635', name: 'STAGE 7' }, 
+            { player: '#6366f1', track: '#fb7185', shadow: '#6366f1', name: 'STAGE 8' }, 
+            { player: '#00f0ff', track: '#eab308', shadow: '#00f0ff', name: 'STAGE 9' }, 
+            { player: '#a855f7', track: '#10b981', shadow: '#a855f7', name: '💀 DOOMSDAY 10' } 
+        ];
+
+        // 獲取當前主題配色
+        function getTheme() {
+            if (gameMode === 'HELL') {
+                return { player: '#ef4444', track: '#7f1d1d', shadow: '#ef4444', name: '無盡地獄' };
+            }
+            return levelThemes[(currentLevel - 1) % levelThemes.length];
+        }
+
+        // 闖關關卡核心機制動態分數計算 (全10關)
+        function getLevelTarget(level) {
+            return 300 + (level - 1) * 500;
+        }
+
+        // 按鍵監聽
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            Space: false
+        };
+
+        // 更新生命值 UI (渲染霓虹愛心或地獄骷髏)
+        function updateLivesUI() {
+            uiLivesContainer.innerHTML = '';
+            if (gameMode === 'HELL') {
+                // 地獄難度顯示骷髏，暗示一觸即死
+                uiLivesContainer.innerHTML = '<i class="fa-solid fa-skull text-red-600 animate-bounce drop-shadow-[0_0_5px_rgba(220,38,38,0.8)] text-sm mr-1"></i><span class="text-red-500 font-extrabold text-[10px] tracking-wider uppercase font-[\'Orbitron\']">SUDDEN DEATH</span>';
+                return;
+            }
+            for (let i = 0; i < 3; i++) {
+                if (i < lives) {
+                    uiLivesContainer.innerHTML += '<i class="fa-solid fa-heart text-red-500 animate-pulse drop-shadow-[0_0_5px_rgba(239,68,68,0.7)] text-sm"></i>';
+                } else {
+                    uiLivesContainer.innerHTML += '<i class="fa-regular fa-heart text-gray-700 text-sm"></i>';
+                }
+            }
+        }
+
+        // 切換遊戲模式選擇
+        function switchGameMode(mode) {
+            gameMode = mode;
+            if (mode === 'CLASSIC') {
+                modeClassicBtn.className = "px-5 py-2.5 rounded-xl border border-cyan-500 bg-cyan-950/40 text-cyan-400 font-bold text-sm tracking-wider transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.3)] hover:scale-105 active:scale-95";
+                modeHellBtn.className = "px-5 py-2.5 rounded-xl border border-red-950/60 bg-transparent text-gray-500 font-bold text-sm tracking-wider transition-all duration-300 opacity-60 hover:opacity-100 hover:border-red-500 hover:text-red-400 hover:scale-105 active:scale-95";
+                
+                modeDesc.innerHTML = '避開不斷襲來的霓虹障礙物！跑滿第一關目標 <span class="text-cyan-400 font-bold">300分</span> 即可進入下一關。全作共 10 關，每關特許 3 條命！';
+                modeWarn.innerHTML = '🔥 警告：經典模式第 5 關【煉獄】與第 10 關【終極決戰】難度將瘋狂飆升！';
+                modeWarn.className = "text-red-400 font-bold animate-pulse";
+                
+                uiHiScoreLabel.textContent = 'HI';
+                hiScoreEl.textContent = String(hiScoreClassic).padStart(5, '0');
+            } else {
+                modeHellBtn.className = "px-5 py-2.5 rounded-xl border border-red-500 bg-red-950/40 text-red-400 font-bold text-sm tracking-wider transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:scale-105 active:scale-95";
+                modeClassicBtn.className = "px-5 py-2.5 rounded-xl border border-cyan-950/60 bg-transparent text-gray-500 font-bold text-sm tracking-wider transition-all duration-300 opacity-60 hover:opacity-100 hover:border-cyan-500 hover:text-cyan-400 hover:scale-105 active:scale-95";
+                
+                modeDesc.innerHTML = '無盡生存修羅場！障礙密度拉滿，初始狂飆速度直接拉高至 <span class="text-red-500 font-bold">12起步</span>，移除所有安全防線！';
+                modeWarn.innerHTML = '💀 警告：地獄模式下只有【1 條生命】！一碰即死！挑戰您的極限無盡高分！';
+                modeWarn.className = "text-red-500 font-extrabold animate-pulse uppercase tracking-wider";
+                
+                uiHiScoreLabel.textContent = 'HELL HI';
+                hiScoreEl.textContent = String(hiScoreHell).padStart(5, '0');
+            }
+        }
+
+        modeClassicBtn.addEventListener('click', () => switchGameMode('CLASSIC'));
+        modeHellBtn.addEventListener('click', () => switchGameMode('HELL'));
+
+        // 1. 火柴人主角物件
+        const stickman = {
+            x: 100,
+            y: 0,
+            baseY: 280, // 地面高度
+            width: 40,
+            height: 60,
+            vy: 0,
+            gravity: 0.6,
+            jumpForce: -12,
+            isJumping: false,
+            doubleJumpAvailable: true,
+            isSliding: false,
+            
+            // 跑步動畫
+            runFrame: 0,
+            runFrameSpeed: 0.15,
+            
+            init() {
+                this.y = this.baseY;
+                this.vy = 0;
+                this.isJumping = false;
+                this.doubleJumpAvailable = true;
+                this.isSliding = false;
+                this.runFrame = 0;
+            },
+
+            jump() {
+                if (this.isSliding) return;
+                
+                if (!this.isJumping) {
+                    this.vy = this.jumpForce;
+                    this.isJumping = true;
+                    this.doubleJumpAvailable = true;
+                    playSound('jump');
+                } else if (this.doubleJumpAvailable) {
+                    this.vy = this.jumpForce * 0.85; // 二段跳稍弱一些
+                    this.doubleJumpAvailable = false;
+                    playSound('jump');
+                }
+            },
+
+            slide(active) {
+                if (this.isJumping) return;
+                
+                if (active) {
+                    if (!this.isSliding) {
+                        playSound('slide');
+                    }
+                    this.isSliding = true;
+                    this.height = 30; // 身高減半
+                } else {
+                    this.isSliding = false;
+                    this.height = 60; // 恢復身高
+                }
+            },
+
+            update() {
+                // 物理重力更新
+                if (this.isJumping) {
+                    this.vy += this.gravity;
+                    this.y += this.vy;
+
+                    // 著地判斷
+                    if (this.y >= this.baseY) {
+                        this.y = this.baseY;
+                        this.vy = 0;
+                        this.isJumping = false;
+                        this.doubleJumpAvailable = true;
+                    }
+                }
+
+                // 滑行物理碰撞盒調整
+                if (this.isSliding) {
+                    this.height = 30;
+                } else {
+                    this.height = 60;
+                }
+
+                // 更新跑步動畫幀
+                if (!this.isJumping && !this.isSliding) {
+                    this.runFrame += this.runFrameSpeed;
+                }
+            },
+
+            draw() {
+                // 受傷無敵時間內交替閃爍，不進行繪製以展現閃爍特效
+                if (isInvulnerable && Math.floor(frameCount / 4) % 2 === 0) {
+                    return;
+                }
+
+                ctx.save();
+                
+                const drawY = this.y;
+                const theme = getTheme();
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = theme.player; 
+
+                // 霓虹發光特效隨關卡變換
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = theme.shadow;
+
+                if (this.isSliding) {
+                    // --- 繪製滑行姿勢火柴人 ---
+                    const bodyX = this.x + 10;
+                    const bodyY = drawY + 15;
+                    
+                    // 頭部
+                    ctx.beginPath();
+                    ctx.arc(bodyX + 15, bodyY - 10, 8, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // 軀幹
+                    ctx.beginPath();
+                    ctx.moveTo(bodyX + 10, bodyY - 5);
+                    ctx.lineTo(bodyX - 10, bodyY + 5);
+                    ctx.stroke();
+
+                    // 前手
+                    ctx.beginPath();
+                    ctx.moveTo(bodyX + 5, bodyY - 2);
+                    ctx.lineTo(bodyX + 15, bodyY + 5);
+                    ctx.stroke();
+
+                    // 後腿 (縮起來向前滑動)
+                    ctx.beginPath();
+                    ctx.moveTo(bodyX - 10, bodyY + 5);
+                    ctx.lineTo(bodyX, bodyY + 15);
+                    ctx.lineTo(bodyX + 15, bodyY + 15);
+                    ctx.stroke();
+
+                } else if (this.isJumping) {
+                    // --- 繪製跳躍姿勢火柴人 ---
+                    // 頭部
+                    ctx.beginPath();
+                    ctx.arc(this.x + 20, drawY - 45, 8, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // 軀幹
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 20, drawY - 37);
+                    ctx.lineTo(this.x + 18, drawY - 12);
+                    ctx.stroke();
+
+                    // 手臂 (向上展開平衡)
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 20, drawY - 32);
+                    ctx.lineTo(this.x + 5, drawY - 42);
+                    ctx.moveTo(this.x + 20, drawY - 32);
+                    ctx.lineTo(this.x + 35, drawY - 42);
+                    ctx.stroke();
+
+                    // 雙腿 (曲腿蜷縮)
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 18, drawY - 12);
+                    ctx.lineTo(this.x + 8, drawY - 2);
+                    ctx.lineTo(this.x + 12, drawY + 8);
+                    ctx.stroke();
+
+                    // 雙腿 (後蹬)
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 18, drawY - 12);
+                    ctx.lineTo(this.x + 25, drawY - 5);
+                    ctx.lineTo(this.x + 20, drawY + 6);
+                    ctx.stroke();
+
+                } else {
+                    // --- 繪製跑步姿勢火柴人 ---
+                    const cycle = Math.floor(this.runFrame) % 4;
+                    
+                    // 頭部
+                    ctx.beginPath();
+                    ctx.arc(this.x + 20, drawY - 50, 8, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // 軀幹
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 20, drawY - 42);
+                    ctx.lineTo(this.x + 20, drawY - 15);
+                    ctx.stroke();
+
+                    // 依據動畫幀繪製跑步的四肢
+                    if (cycle === 0) {
+                        ctx.beginPath(); // 左手
+                        ctx.moveTo(this.x + 20, drawY - 35);
+                        ctx.lineTo(this.x + 32, drawY - 25);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 右手
+                        ctx.moveTo(this.x + 20, drawY - 35);
+                        ctx.lineTo(this.x + 5, drawY - 25);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 左腿 (前跨)
+                        ctx.moveTo(this.x + 20, drawY - 15);
+                        ctx.lineTo(this.x + 30, drawY - 5);
+                        ctx.lineTo(this.x + 35, drawY);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 右腿 (後蹬)
+                        ctx.moveTo(this.x + 20, drawY - 15);
+                        ctx.lineTo(this.x + 10, drawY - 5);
+                        ctx.lineTo(this.x + 5, drawY - 2);
+                        ctx.stroke();
+                    } else if (cycle === 1 || cycle === 3) {
+                        ctx.beginPath(); // 左手
+                        ctx.moveTo(this.x + 20, drawY - 35);
+                        ctx.lineTo(this.x + 25, drawY - 20);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 右手
+                        ctx.moveTo(this.x + 20, drawY - 35);
+                        ctx.lineTo(this.x + 15, drawY - 20);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 左腿
+                        ctx.moveTo(this.x + 20, drawY - 15);
+                        ctx.lineTo(this.x + 22, drawY - 5);
+                        ctx.lineTo(this.x + 20, drawY);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 右腿
+                        ctx.moveTo(this.x + 20, drawY - 15);
+                        ctx.lineTo(this.x + 18, drawY - 5);
+                        ctx.lineTo(this.x + 15, drawY);
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath(); // 左手
+                        ctx.moveTo(this.x + 20, drawY - 35);
+                        ctx.lineTo(this.x + 5, drawY - 25);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 右手
+                        ctx.moveTo(this.x + 20, drawY - 35);
+                        ctx.lineTo(this.x + 32, drawY - 25);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 左腿 (後蹬)
+                        ctx.moveTo(this.x + 20, drawY - 15);
+                        ctx.lineTo(this.x + 10, drawY - 5);
+                        ctx.lineTo(this.x + 3, drawY - 2);
+                        ctx.stroke();
+
+                        ctx.beginPath(); // 右腿 (前跨)
+                        ctx.moveTo(this.x + 20, drawY - 15);
+                        ctx.lineTo(this.x + 28, drawY - 5);
+                        ctx.lineTo(this.x + 33, drawY);
+                        ctx.stroke();
+                    }
+                }
+
+                ctx.restore();
+            }
+        };
+
+        // 2. 障礙物管理
+        let obstacles = [];
+        const obstacleTypes = [
+            { type: 'low_spike', width: 20, height: 35, color: '#ff0055', yOffset: 0 },       // 1. 低尖刺
+            { type: 'high_laser', width: 35, height: 40, color: '#ffff00', yOffset: -50 },     // 2. 高空雷射
+            { type: 'drone', width: 25, height: 25, color: '#ff00ff', yOffset: -30 },          // 3. 漂浮無人機
+            { type: 'double_spike', width: 45, height: 35, color: '#ff0055', yOffset: 0 },     // 4. 寬尖刺
+            { type: 'ground_saw', width: 32, height: 32, color: '#f97316', yOffset: 0 },       // 5. 旋轉地鋸
+            { type: 'missile', width: 45, height: 16, color: '#ef4444', yOffset: -28 },        // 6. 急速飛彈
+            { type: 'tall_wall', width: 20, height: 75, color: '#10b981', yOffset: 0 },        // 7. 高能阻隔牆
+            { type: 'bouncing_ball', width: 26, height: 26, color: '#a855f7', yOffset: -35 }   // 8. 波動電磁球
+        ];
+
+        function spawnObstacle() {
+            const roll = Math.random();
+            let obstDef = obstacleTypes[0];
+
+            if (gameMode === 'HELL' || currentLevel === 5 || currentLevel === 10) {
+                // 地獄或魔王關卡：高頻率出沒高殺傷力障礙 (飛彈與高能阻隔牆)
+                if (roll < 0.30) {
+                    obstDef = obstacleTypes[5]; // 急速飛彈
+                } else if (roll < 0.60) {
+                    obstDef = obstacleTypes[6]; // 高能阻隔牆
+                } else if (roll < 0.80) {
+                    obstDef = obstacleTypes[4]; // 旋轉地鋸
+                } else {
+                    obstDef = obstacleTypes[7]; // 波動電磁球
+                }
+            } else {
+                // 一般關卡
+                if (roll < 0.12) {
+                    obstDef = obstacleTypes[0]; 
+                } else if (roll < 0.24) {
+                    obstDef = obstacleTypes[1]; 
+                } else if (roll < 0.36) {
+                    obstDef = obstacleTypes[2]; 
+                } else if (roll < 0.48) {
+                    obstDef = obstacleTypes[3]; 
+                } else if (roll < 0.60) {
+                    obstDef = obstacleTypes[4]; 
+                } else if (roll < 0.72) {
+                    obstDef = obstacleTypes[5]; 
+                } else if (roll < 0.85) {
+                    obstDef = obstacleTypes[6]; 
+                } else {
+                    obstDef = obstacleTypes[7]; 
+                }
+            }
+
+            const targetY = obstDef.yOffset === 0 
+                ? stickman.baseY 
+                : stickman.baseY + obstDef.yOffset;
+
+            obstacles.push({
+                x: canvas.width + 100,
+                y: targetY,
+                baseYOffset: obstDef.yOffset, 
+                width: obstDef.width,
+                height: obstDef.height,
+                color: obstDef.color,
+                type: obstDef.type,
+                pulse: 0
+            });
+        }
+
+        function updateObstacles() {
+            // 安全間距因子
+            let gapFactor = Math.max(0.60, 1.0 - (currentLevel - 1) * 0.08);
+            if (gameMode === 'HELL') gapFactor = 0.42; // 地獄模式極限超密出怪
+            else if (currentLevel === 5) gapFactor = 0.52;  
+            else if (currentLevel === 10) gapFactor = 0.45; 
+
+            const minGap = Math.max(60, (160 - gameSpeed * 5.5) * gapFactor);
+            const randomChance = Math.random() < 0.04;
+            
+            if (obstacles.length === 0) {
+                spawnObstacle();
+            } else {
+                const lastObstacle = obstacles[obstacles.length - 1];
+                if (canvas.width - lastObstacle.x > minGap && randomChance) {
+                    spawnObstacle();
+                }
+            }
+
+            // 更新障礙物移動
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obst = obstacles[i];
+                obst.pulse += 0.1;
+
+                if (obst.type === 'missile') {
+                    // 飛彈飛行速度極快 (地獄模式更是 1.7 倍速度狂野突襲)
+                    const missileSpeedMult = (gameMode === 'HELL') ? 1.7 : (currentLevel === 5 || currentLevel === 10 ? 1.6 : 1.45);
+                    obst.x -= gameSpeed * missileSpeedMult;
+                    
+                    if (Math.random() < 0.5) {
+                        particles.push({
+                            x: obst.x + obst.width,
+                            y: obst.y - obst.height / 2 + (Math.random() - 0.5) * 6,
+                            vx: gameSpeed * 0.5 + Math.random() * 2,
+                            vy: (Math.random() - 0.5) * 2,
+                            radius: Math.random() * 3 + 1.5,
+                            color: '#f97316', 
+                            alpha: 0.8,
+                            decay: 0.08
+                        });
+                    }
+                } else if (obst.type === 'bouncing_ball') {
+                    obst.x -= gameSpeed;
+                    const waveHeight = (gameMode === 'HELL' || currentLevel === 5 || currentLevel === 10) ? 45 : 35; 
+                    obst.y = stickman.baseY + obst.baseYOffset + Math.sin(obst.pulse * 1.5) * waveHeight;
+                } else {
+                    obst.x -= gameSpeed;
+                }
+
+                if (obst.x < -obst.width - 100) {
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obst => {
+                ctx.save();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = obst.color;
+                ctx.shadowBlur = 12 + Math.sin(obst.pulse) * 4; 
+                ctx.shadowColor = obst.color;
+
+                if (obst.type === 'low_spike') {
+                    ctx.beginPath();
+                    ctx.moveTo(obst.x, obst.y);
+                    ctx.lineTo(obst.x + obst.width / 2, obst.y - obst.height);
+                    ctx.lineTo(obst.x + obst.width, obst.y);
+                    ctx.closePath();
+                    ctx.stroke();
+                    ctx.fillStyle = obst.color + '22';
+                    ctx.fill();
+                } 
+                else if (obst.type === 'double_spike') {
+                    ctx.beginPath();
+                    ctx.moveTo(obst.x, obst.y);
+                    ctx.lineTo(obst.x + obst.width * 0.25, obst.y - obst.height);
+                    ctx.lineTo(obst.x + obst.width * 0.5, obst.y);
+                    ctx.lineTo(obst.x + obst.width * 0.75, obst.y - obst.height * 0.8);
+                    ctx.lineTo(obst.x + obst.width, obst.y);
+                    ctx.stroke();
+                    ctx.fillStyle = obst.color + '22';
+                    ctx.fill();
+                }
+                else if (obst.type === 'high_laser') {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(obst.x, obst.y - 100, obst.width, obst.height);
+                    ctx.strokeRect(obst.x, obst.y - 100, obst.width, obst.height);
+                    
+                    ctx.lineWidth = 4 + Math.sin(obst.pulse) * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(obst.x - 20, obst.y - 80);
+                    ctx.lineTo(obst.x + obst.width + 20, obst.y - 80);
+                    ctx.stroke();
+                } 
+                else if (obst.type === 'drone') {
+                    const bounce = Math.sin(obst.pulse) * 5;
+                    const dy = obst.y + bounce;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(obst.x, dy);
+                    ctx.lineTo(obst.x + obst.width, dy);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(obst.x + obst.width / 2, dy, 6, 0, Math.PI * 2);
+                    ctx.fillStyle = obst.color;
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(obst.x + obst.width / 2, dy);
+                    ctx.lineTo(obst.x + obst.width / 2, dy + 15);
+                    ctx.stroke();
+                }
+                else if (obst.type === 'ground_saw') {
+                    const radius = obst.width / 2;
+                    const cx = obst.x + radius;
+                    const cy = obst.y - radius;
+                    const angleOffset = obst.pulse * 1.5; 
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius - 4, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.fillStyle = obst.color + '15';
+                    ctx.fill();
+
+                    const teeth = 8;
+                    ctx.beginPath();
+                    for (let t = 0; t < teeth; t++) {
+                        const angle = (t / teeth) * Math.PI * 2 + angleOffset;
+                        const nextAngle = ((t + 0.5) / teeth) * Math.PI * 2 + angleOffset;
+                        
+                        const outerX = cx + Math.cos(angle) * radius;
+                        const outerY = cy + Math.sin(angle) * radius;
+                        const innerX = cx + Math.cos(nextAngle) * (radius - 8);
+                        const innerY = cy + Math.sin(nextAngle) * (radius - 8);
+
+                        if (t === 0) ctx.moveTo(outerX, outerY);
+                        else ctx.lineTo(outerX, outerY);
+                        ctx.lineTo(innerX, innerY);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = obst.color;
+                    ctx.fill();
+                }
+                else if (obst.type === 'missile') {
+                    const my = obst.y - obst.height / 2;
+                    
+                    ctx.fillStyle = '#1e293b';
+                    ctx.beginPath();
+                    ctx.moveTo(obst.x + obst.width, my); 
+                    ctx.lineTo(obst.x + 12, my - obst.height / 2); 
+                    ctx.quadraticCurveTo(obst.x, my, obst.x + 12, my + obst.height / 2); 
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(obst.x + obst.width - 12, my - obst.height / 2);
+                    ctx.lineTo(obst.x + obst.width, my - obst.height);
+                    ctx.lineTo(obst.x + obst.width - 4, my);
+                    ctx.lineTo(obst.x + obst.width, my + obst.height);
+                    ctx.lineTo(obst.x + obst.width - 12, my + obst.height / 2);
+                    ctx.closePath();
+                    ctx.fillStyle = obst.color;
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(obst.x + 12, my, 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                else if (obst.type === 'tall_wall') {
+                    const w = obst.width;
+                    const h = obst.height;
+                    const rx = obst.x;
+                    const ry = obst.y - h;
+
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(rx - 4, obst.y - 8, w + 8, 8);
+                    ctx.strokeRect(rx - 4, obst.y - 8, w + 8, 8);
+
+                    ctx.strokeRect(rx, ry, w, h - 8);
+                    
+                    ctx.fillStyle = obst.color + '25';
+                    ctx.fillRect(rx, ry, w, h - 8);
+
+                    ctx.lineWidth = 2 + Math.sin(obst.pulse * 3) * 1;
+                    ctx.beginPath();
+                    ctx.moveTo(rx + w / 2, ry);
+                    ctx.lineTo(rx + w / 2, obst.y - 8);
+                    ctx.stroke();
+                }
+                else if (obst.type === 'bouncing_ball') {
+                    const cx = obst.x + obst.width / 2;
+                    const cy = obst.y - obst.height / 2;
+                    const r = obst.width / 2;
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r - 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, r + 4, 4, obst.pulse * 0.8, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = obst.color;
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            });
+        }
+
+        // 3. 粒子特效與煙火系統
+        let particles = [];
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8 - 3,
+                    radius: Math.random() * 4 + 2,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.01
+                });
+            }
+        }
+
+        function createVictoryFireworks() {
+            if (Math.random() < 0.1) {
+                const rx = Math.random() * 800;
+                const ry = Math.random() * 250;
+                const colors = ['#00f0ff', '#ff007f', '#10b981', '#fbbf24', '#a855f7', '#f43f5e'];
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                createExplosion(rx, ry, randomColor);
+            }
+        }
+
+        function createRunDust() {
+            const theme = getTheme();
+            if (!stickman.isJumping && !stickman.isSliding && Math.random() < 0.3) {
+                particles.push({
+                    x: stickman.x + 5,
+                    y: stickman.baseY,
+                    vx: -gameSpeed * 0.3 - Math.random() * 2,
+                    vy: -Math.random() * 2,
+                    radius: Math.random() * 3 + 1,
+                    color: theme.player + '33', 
+                    alpha: 0.6,
+                    decay: 0.05
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        // 4. 背景與霓虹跑道繪製
+        let bgOffset = 0;
+        let starField = [];
+
+        for (let i = 0; i < 40; i++) {
+            starField.push({
+                x: Math.random() * 800,
+                y: Math.random() * 200,
+                size: Math.random() * 2,
+                speed: Math.random() * 0.5 + 0.1
+            });
+        }
+
+        function drawBackground() {
+            starField.forEach(star => {
+                star.x -= star.speed * (gameSpeed / baseSpeed);
+                if (star.x < 0) star.x = 800;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+            });
+
+            bgOffset -= gameSpeed * 0.15;
+            if (bgOffset <= -800) bgOffset = 0;
+
+            ctx.save();
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(bgOffset, 280);
+            
+            const drawCityscape = (offset) => {
+                ctx.lineTo(offset, 280);
+                ctx.lineTo(offset + 50, 200);
+                ctx.lineTo(offset + 100, 200);
+                ctx.lineTo(offset + 120, 280);
+                ctx.lineTo(offset + 180, 160);
+                ctx.lineTo(offset + 240, 160);
+                ctx.lineTo(offset + 260, 280);
+                ctx.lineTo(offset + 350, 220);
+                ctx.lineTo(offset + 420, 220);
+                ctx.lineTo(offset + 460, 280);
+                ctx.lineTo(offset + 550, 140);
+                ctx.lineTo(offset + 600, 140);
+                ctx.lineTo(offset + 640, 280);
+                ctx.lineTo(offset + 800, 280);
+            };
+
+            drawCityscape(bgOffset);
+            drawCityscape(bgOffset + 800);
+            
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(0, canvas.height);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            // 網格底座
+            ctx.save();
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            
+            for (let i = 280; i <= canvas.height; i += 20) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            const theme = getTheme();
+            ctx.strokeStyle = theme.track; 
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = theme.track;
+            ctx.beginPath();
+            ctx.moveTo(0, 280);
+            ctx.lineTo(canvas.width, 280);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 5. 碰撞偵測 (AABB)
+        function checkCollisions() {
+            if (isInvulnerable) return;
+
+            const stickX = stickman.x;
+            const stickWidth = stickman.width;
+            const stickHeight = stickman.height;
+            const stickY = stickman.isSliding ? stickman.y - 15 : stickman.y - 60;
+
+            for (let obst of obstacles) {
+                let obstX = obst.x + 3;
+                let obstWidth = obst.width - 6;
+                let obstHeight = obst.height;
+                let obstY = obst.y - obstHeight;
+
+                if (obst.type === 'high_laser') {
+                    obstHeight = 12;
+                    obstY = obst.y - 80 - 6;
+                } else if (obst.type === 'missile') {
+                    obstHeight = 14;
+                    obstY = obst.y - obst.height / 2 - 7;
+                } else if (obst.type === 'bouncing_ball') {
+                    obstWidth = obst.width - 4;
+                    obstHeight = obst.height - 4;
+                    obstY = obst.y - obst.height + 2;
+                }
+
+                if (
+                    stickX < obstX + obstWidth &&
+                    stickX + stickWidth > obstX &&
+                    stickY < obstY + obstHeight &&
+                    stickY + stickHeight > obstY
+                ) {
+                    lives--;
+                    updateLivesUI();
+
+                    if (lives > 0) {
+                        // 經典模式有剩餘命：進入無敵時間
+                        shakeFrames = 15; 
+                        playSound('hit');
+
+                        const theme = getTheme();
+                        createExplosion(stickman.x + 20, stickman.y - 30, theme.player);
+                        createExplosion(stickman.x + 20, stickman.y - 30, '#ef4444');
+
+                        isInvulnerable = true;
+                        invulnerableTimer = 90; 
+
+                        // 清場
+                        obstacles = [];
+                    } else {
+                        // 生命歸零：直接死亡
+                        handleGameOver();
+                    }
+                    break;
+                }
+            }
+        }
+
+        // 6. 核心更新與渲染循環
+        function update() {
+            if (gameState === 'VICTORY') {
+                createVictoryFireworks();
+                updateParticles();
+                return;
+            }
+
+            if (gameState !== 'PLAYING') {
+                if (gameState === 'LEVEL_CLEAR') {
+                    levelClearTimer--;
+                    const percent = (levelClearTimer / 180) * 100;
+                    transitionProgress.style.width = `${percent}%`;
+
+                    if (levelClearTimer <= 0) {
+                        enterNextLevel();
+                    }
+                }
+                return;
+            }
+
+            frameCount++;
+            levelFrameCount++;
+            
+            // 更新無敵時間
+            if (isInvulnerable) {
+                invulnerableTimer--;
+                if (invulnerableTimer <= 0) {
+                    isInvulnerable = false;
+                }
+            }
+
+            createRunDust();
+            updateParticles();
+            stickman.update();
+            updateObstacles();
+            checkCollisions();
+
+            // 關卡內動態加速機制
+            if (levelFrameCount % 600 === 0 && gameSpeed < maxSpeed) {
+                gameSpeed += 0.8;
+                speedAlertEl.classList.remove('opacity-0');
+                speedAlertEl.classList.add('opacity-100');
+                setTimeout(() => {
+                    speedAlertEl.classList.add('opacity-0');
+                    speedAlertEl.classList.remove('opacity-100');
+                }, 1500);
+            }
+
+            if (gameMode === 'CLASSIC') {
+                // 經典關卡目標判定
+                const targetScore = getLevelTarget(currentLevel);
+                currentLevelScore = Math.floor(levelFrameCount / 6);
+                totalScore = accumulatedScore + currentLevelScore;
+
+                currentScoreEl.textContent = String(totalScore).padStart(5, '0');
+
+                // 實時進度條
+                const progressPercent = Math.min(100, (currentLevelScore / targetScore) * 100);
+                uiProgress.style.width = `${progressPercent}%`;
+                uiProgressText.textContent = Math.min(targetScore, currentLevelScore);
+
+                if (currentLevelScore >= targetScore) {
+                    handleLevelClear();
+                }
+            } else {
+                // 地獄無盡模式：分數無限狂升，沒有過關限制
+                totalScore = Math.floor(levelFrameCount / 5); // 分數獲取速度稍微加成
+                currentScoreEl.textContent = String(totalScore).padStart(5, '0');
+                
+                uiProgress.style.width = '100%';
+                uiProgressText.textContent = totalScore;
+            }
+
+            // 慶祝播效
+            if (totalScore > 0 && totalScore % 1000 === 0 && frameCount % 6 === 0) {
+                playSound('score');
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            if (shakeFrames > 0) {
+                const dx = (Math.random() - 0.5) * 12;
+                const dy = (Math.random() - 0.5) * 12;
+                ctx.translate(dx, dy);
+                shakeFrames--;
+            }
+
+            drawBackground();
+            drawParticles();
+            
+            if (gameState !== 'VICTORY') {
+                drawObstacles();
+                stickman.draw();
+            }
+
+            ctx.restore();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // 7. 關卡清除與進入下一關機制
+        function handleLevelClear() {
+            if (currentLevel === 10) {
+                handleVictory();
+                return;
+            }
+
+            gameState = 'LEVEL_CLEAR';
+            levelClearTimer = 180; 
+            playSound('level_clear');
+
+            const theme = getTheme();
+            createExplosion(400, 200, theme.player);
+            createExplosion(400, 200, theme.track);
+            createExplosion(200, 150, '#10b981');
+            createExplosion(600, 150, '#f59e0b');
+
+            accumulatedScore += getLevelTarget(currentLevel);
+            currentLevelScore = 0;
+
+            clearLevelNum.textContent = currentLevel;
+
+            if (currentLevel + 1 === 5) {
+                uiNextLevelWarning.innerHTML = "🚨 極限難度警告：下一關將解鎖第 5 關【💀 煉獄模式】！速度、出怪頻率與飛彈襲擊率均狂飆！";
+                uiNextLevelWarning.className = "text-xs text-red-500 font-extrabold tracking-widest uppercase animate-pulse";
+            } else if (currentLevel + 1 === 10) {
+                uiNextLevelWarning.innerHTML = "🚨 終極決戰警告：下一關將解鎖終極第 10 關【💀 終極決戰】！迎擊極高密度的彈幕級障礙阻擊！";
+                uiNextLevelWarning.className = "text-xs text-red-500 font-extrabold tracking-widest uppercase animate-pulse";
+            } else {
+                uiNextLevelWarning.innerHTML = "難度提示：下一關目標提高 500 分，速度更快且障礙物更密集！";
+                uiNextLevelWarning.className = "text-xs text-rose-400 font-semibold tracking-wider";
+            }
+
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                overlay.classList.remove('opacity-0');
+                levelClearState.classList.remove('hidden');
+            }, 10);
+        }
+
+        function enterNextLevel() {
+            currentLevel++;
+            gameState = 'PLAYING';
+            levelFrameCount = 0;
+
+            lives = 3;
+            isInvulnerable = false;
+            invulnerableTimer = 0;
+            updateLivesUI();
+
+            baseSpeed = 6 + (currentLevel - 1) * 1.1;
+            maxSpeed = 15 + (currentLevel - 1) * 1.6;
+
+            if (currentLevel === 5) {
+                baseSpeed = 11; 
+                maxSpeed = 19;
+                uiWarningBadge.textContent = "💀 HELL STAGE 5";
+                uiWarningBadge.classList.remove('hidden');
+            } else if (currentLevel === 10) {
+                baseSpeed = 15; 
+                maxSpeed = 24;
+                uiWarningBadge.textContent = "💀 DOOMSDAY 10";
+                uiWarningBadge.classList.remove('hidden');
+            } else {
+                uiWarningBadge.classList.add('hidden');
+            }
+
+            gameSpeed = baseSpeed;
+
+            obstacles = [];
+            particles = [];
+            
+            stickman.init();
+
+            uiLevel.textContent = currentLevel;
+            uiProgress.style.width = '0%';
+            uiProgressText.textContent = '0';
+            
+            const nextTarget = getLevelTarget(currentLevel);
+            uiTargetScore.textContent = nextTarget;
+
+            const theme = getTheme();
+            uiLevel.style.borderColor = theme.player;
+            uiLevel.style.color = theme.player;
+            uiProgress.style.background = `linear-gradient(to right, ${theme.player}, ${theme.track})`;
+
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                levelClearState.classList.add('hidden');
+            }, 300);
+        }
+
+        // 8. 經典模式終極通關機制
+        function handleVictory() {
+            gameState = 'VICTORY';
+            playSound('victory');
+
+            accumulatedScore += getLevelTarget(10);
+            totalScore = accumulatedScore;
+            currentScoreEl.textContent = String(totalScore).padStart(5, '0');
+
+            if (totalScore > hiScoreClassic) {
+                hiScoreClassic = totalScore;
+                localStorage.setItem('stickman_hi_score_classic', hiScoreClassic);
+                if (gameMode === 'CLASSIC') {
+                    hiScoreEl.textContent = String(hiScoreClassic).padStart(5, '0');
+                }
+            }
+
+            victoryScoreEl.textContent = totalScore;
+
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                overlay.classList.remove('opacity-0');
+                gameVictoryState.classList.remove('hidden');
+            }, 10);
+        }
+
+        // 9. 遊戲控制與啟動
+        function startGame() {
+            gameState = 'PLAYING';
+            totalScore = 0;
+            currentLevelScore = 0;
+            accumulatedScore = 0;
+            frameCount = 0;
+            levelFrameCount = 0;
+            isInvulnerable = false;
+            invulnerableTimer = 0;
+            
+            obstacles = [];
+            particles = [];
+            
+            if (gameMode === 'CLASSIC') {
+                // 經典 10 關模式重置
+                currentLevel = 1;
+                lives = 3;
+                baseSpeed = 6;
+                maxSpeed = 15;
+                gameSpeed = baseSpeed;
+                uiWarningBadge.classList.add('hidden');
+
+                const startTarget = getLevelTarget(1);
+                uiLevel.textContent = '1';
+                uiLevel.style.borderColor = '#00f0ff';
+                uiLevel.style.color = '#00f0ff';
+                uiProgress.style.width = '0%';
+                uiProgressText.textContent = '0';
+                uiTargetScore.textContent = startTarget;
+                uiProgress.style.background = 'linear-gradient(to right, #00f0ff, #ff007f)';
+            } else {
+                // 無盡地獄模式重置
+                currentLevel = 'HELL';
+                lives = 1; // 一觸即死
+                baseSpeed = 12; // 狂飆速度
+                maxSpeed = 26;
+                gameSpeed = baseSpeed;
+                
+                // 啟用警報閃爍燈
+                uiWarningBadge.textContent = "💀 INF HELL MODE";
+                uiWarningBadge.classList.remove('hidden');
+
+                uiLevel.textContent = 'HELL';
+                uiLevel.style.borderColor = '#ef4444';
+                uiLevel.style.color = '#ef4444';
+                
+                uiProgress.style.width = '100%';
+                uiProgressText.textContent = '0';
+                uiTargetScore.textContent = '∞';
+                uiProgress.style.background = 'linear-gradient(to right, #ef4444, #7f1d1d)';
+            }
+
+            updateLivesUI();
+            stickman.init();
+            
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+                startState.classList.add('hidden');
+                levelClearState.classList.add('hidden');
+                gameVictoryState.classList.add('hidden');
+                gameoverState.classList.add('hidden');
+            }, 300);
+
+            if (!audioCtx) {
+                audioCtx = new AudioCtx();
+            }
+        }
+
+        function handleGameOver() {
+            gameState = 'GAMEOVER';
+            shakeFrames = 15;
+            playSound('hit');
+
+            const theme = getTheme();
+            createExplosion(stickman.x + 20, stickman.y - 30, theme.player);
+            createExplosion(stickman.x + 20, stickman.y - 30, theme.track);
+            createExplosion(stickman.x + 20, stickman.y - 30, '#ffff00');
+
+            // 紀錄歷史最高分
+            if (gameMode === 'CLASSIC') {
+                if (totalScore > hiScoreClassic) {
+                    hiScoreClassic = totalScore;
+                    localStorage.setItem('stickman_hi_score_classic', hiScoreClassic);
+                    hiScoreEl.textContent = String(hiScoreClassic).padStart(5, '0');
+                }
+                gameoverScoreDesc.textContent = "生命耗盡！本次累計總得分";
+                gameoverLevelDesc.innerHTML = `敗在第 <span id="gameover-level-num" class="text-white font-bold">${currentLevel}</span> 關，再接再厲！`;
+                
+                // 動態設定死亡畫面模式切換按鈕 (經典落敗，推薦挑戰地獄)
+                gameoverSwitchBtn.innerHTML = '<i class="fa-solid fa-skull mr-1.5 animate-pulse"></i> 挑戰地獄模式 💀';
+                gameoverSwitchBtn.className = "w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white font-bold text-lg rounded-full shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all duration-300 transform hover:scale-105 active:scale-95";
+            } else {
+                if (totalScore > hiScoreHell) {
+                    hiScoreHell = totalScore;
+                    localStorage.setItem('stickman_hi_score_hell', hiScoreHell);
+                    hiScoreEl.textContent = String(hiScoreHell).padStart(5, '0');
+                }
+                gameoverScoreDesc.textContent = "地獄覆滅！本次生存極限得分";
+                gameoverLevelDesc.innerHTML = `在無盡地獄中光榮戰死！💀`;
+                
+                // 動態設定死亡畫面模式切換按鈕 (地獄戰死，切回經典)
+                gameoverSwitchBtn.innerHTML = '<i class="fa-solid fa-layer-group mr-1.5"></i> 切換經典模式';
+                gameoverSwitchBtn.className = "w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-lg rounded-full shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all duration-300 transform hover:scale-105 active:scale-95";
+            }
+
+            finalScoreEl.textContent = totalScore;
+            
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                overlay.classList.remove('opacity-0');
+                gameoverState.classList.remove('hidden');
+            }, 10);
+        }
+
+        // 10. 操作控制監聽
+        window.addEventListener('keydown', (e) => {
+            if (['Space', 'ArrowUp', 'ArrowDown', ' '].includes(e.key) && gameState === 'PLAYING') {
+                e.preventDefault();
+            }
+
+            if (gameState === 'PLAYING') {
+                if (e.key === 'ArrowUp' || e.key === ' ' || e.code === 'Space') {
+                    if (!keys.ArrowUp) {
+                        stickman.jump();
+                        keys.ArrowUp = true;
+                    }
+                }
+                if (e.key === 'ArrowDown') {
+                    stickman.slide(true);
+                    keys.ArrowDown = true;
+                }
+            } else if (gameState === 'START' && (e.key === ' ' || e.code === 'Space' || e.key === 'Enter')) {
+                startGame();
+            } else if (gameState === 'GAMEOVER' && (e.key === ' ' || e.code === 'Space' || e.key === 'Enter')) {
+                startGame();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp' || e.key === ' ' || e.code === 'Space') {
+                keys.ArrowUp = false;
+            }
+            if (e.key === 'ArrowDown') {
+                stickman.slide(false);
+                keys.ArrowDown = false;
+            }
+        });
+
+        startBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startGame();
+        });
+        restartBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startGame();
+        });
+        victoryRestartBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startGame();
+        });
+
+        // 死亡画面模式切換按鈕點擊監聽
+        gameoverSwitchBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (gameMode === 'CLASSIC') {
+                switchGameMode('HELL');
+            } else {
+                switchGameMode('CLASSIC');
+            }
+            startGame();
+        });
+
+        // 手機與觸控事件
+        btnJump.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') {
+                stickman.jump();
+            }
+        });
+        btnJump.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') {
+                stickman.jump();
+            }
+        });
+
+        btnSlide.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') {
+                stickman.slide(true);
+            }
+        });
+        btnSlide.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') {
+                stickman.slide(false);
+            }
+        });
+        btnSlide.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') {
+                stickman.slide(true);
+            }
+        });
+        btnSlide.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') {
+                stickman.slide(false);
+            }
+        });
+        btnSlide.addEventListener('mouseleave', () => {
+            if (gameState === 'PLAYING') {
+                stickman.slide(false);
+            }
+        });
+
+        // 靜音切換
+        muteBtn.addEventListener('click', () => {
+            isMuted = !isMuted;
+            if (isMuted) {
+                muteIcon.className = 'fa-solid fa-volume-xmark';
+                muteText.textContent = '靜音';
+            } else {
+                muteIcon.className = 'fa-solid fa-volume-high';
+                muteText.textContent = '音效開啟';
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            }
+        });
+
+        // 初始化生命 UI 與生命顯示
+        updateLivesUI();
+        // 啟動動畫循環
+        loop();
+    </script>
+</body>
+</html>
